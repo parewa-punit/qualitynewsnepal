@@ -11,9 +11,15 @@ module.exports = {
 	 * 		- the 'www'
 	 * 		- anything after the main domain: /..., ?..., #...
 	 * 2. Get whois information for the domain
-	 * @param {string} domain
+	 * 
+	 * @returns {json}
+	 * 		creation_date	YYYY-MM-DD
+	 * 		date_is_valid	bool
+	 * 		domain_name		string
+	 * 		message			string
 	 */
 	whois: function(req, res){
+		var moment = require('moment');
 		var whois = require('whois');
 		var data = req.body;
 		console.log(data);
@@ -22,21 +28,27 @@ module.exports = {
 			pageurl = pageurl.split('//')[1];
 		pageurl = pageurl.replace('www.', '');
 		var domain = pageurl.split(/[/?#]/)[0];
-		console.log(domain);
 
 		var lookupInfo = {};
 		whois.lookup(domain, function (err, data) {
-			res.send(data);
-			// var fields = data.split(/\r?\n/g);
-			// fields.forEach(function (field) {
-			// 	if (field.indexOf(":") > -1) {
-			// 		var keyValue = field.split(":");
-			// 		var key = keyValue[0];
-			// 		var value = keyValue[1];
-			// 		lookupInfo[key] = value;
-			// 	}
-			// });
-			// res.json(lookupInfo);
+			var fields = data.split(/\r?\n/g);
+			for (var i = 0; i < fields.length; i++) {
+				if (fields[i].indexOf('Domain Name:') > -1){
+					var domain_name = fields[i].split(':')[1].trim();
+					lookupInfo['domain_name'] = domain_name;
+				}
+				else if (fields[i].indexOf('Creation Date:') > -1){
+					var now = moment();
+					var creation_date_str = fields[i].split(':')[1].split('T')[0].trim();
+					lookupInfo['creation_date'] = creation_date_str;
+					var creationDate = moment(creation_date_str);
+					var dateIsValid = now.diff(creationDate, 'years', true) >= 1;
+					lookupInfo['date_is_valid'] = dateIsValid;
+					lookupInfo['message'] = dateIsValid ? '' : res.i18n('MsgInvalidDate');
+					break;
+				}
+			}
+			res.send(lookupInfo);
 		});
 	}
 };
